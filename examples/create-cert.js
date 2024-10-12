@@ -1,7 +1,7 @@
 var forge = require('..');
 
-console.log('Generating 2048-bit key-pair...');
-var keys = forge.pki.rsa.generateKeyPair(2048);
+console.log('Generating 4096-bit key-pair...');
+var keys = forge.pki.rsa.generateKeyPair(4096); // Increased key size to 4096 bits
 console.log('Key-pair created.');
 
 console.log('Creating self-signed certificate...');
@@ -11,6 +11,7 @@ cert.serialNumber = '01';
 cert.validity.notBefore = new Date();
 cert.validity.notAfter = new Date();
 cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1);
+
 var attrs = [{
   name: 'commonName',
   value: 'example.org'
@@ -30,12 +31,12 @@ var attrs = [{
   shortName: 'OU',
   value: 'Test'
 }];
+
 cert.setSubject(attrs);
 cert.setIssuer(attrs);
 cert.setExtensions([{
   name: 'basicConstraints',
-  cA: true/*,
-  pathLenConstraint: 4*/
+  cA: true
 }, {
   name: 'keyUsage',
   keyCertSign: true,
@@ -70,11 +71,13 @@ cert.setExtensions([{
   }]
 }, {
   name: 'subjectKeyIdentifier'
+}, {
+  name: 'authorityKeyIdentifier', // Added authorityKeyIdentifier extension
+  keyIdentifier: forge.pki.getPublicKeyFingerprint(cert.publicKey, {md: forge.md.sha256.create()})
 }]);
-// FIXME: add authorityKeyIdentifier extension
 
-// self-sign certificate
-cert.sign(keys.privateKey/*, forge.md.sha256.create()*/);
+// Self-sign the certificate with SHA-256
+cert.sign(keys.privateKey, forge.md.sha256.create());
 console.log('Certificate created.');
 
 // PEM-format keys and cert
@@ -91,20 +94,20 @@ console.log(pem.publicKey);
 console.log('\nCertificate:');
 console.log(pem.certificate);
 
-// verify certificate
+// Verify certificate
 var caStore = forge.pki.createCaStore();
 caStore.addCertificate(cert);
 try {
   forge.pki.verifyCertificateChain(caStore, [cert],
     function(vfd, depth, chain) {
-      if(vfd === true) {
+      if (vfd === true) {
         console.log('SubjectKeyIdentifier verified: ' +
           cert.verifySubjectKeyIdentifier());
         console.log('Certificate verified.');
       }
       return true;
     });
-} catch(ex) {
+} catch (ex) {
   console.log('Certificate verification failure: ' +
     JSON.stringify(ex, null, 2));
 }
